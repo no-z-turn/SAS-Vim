@@ -1,166 +1,105 @@
 " Vim indent file
-" Language:     SAS 
-" Version:  0.2
-" Last Change:  2005 Apr. 22
-" Maintainer: Jianzhong Liu <jliu7@uiuc.edu>
-" Usage:  Do :help sas-indent from Vim
+" Language:	    SAS
+" Maintainer:       Zhenhuan Hu <zhu@mcw.edu>
+" Latest Revision:  2012-05-09
 
-" Only load this indent file when no other was loaded.
 if exists("b:did_indent")
-  finish
+	finish
 endif
 let b:did_indent = 1
 
-"flag indicating if it is in a comments area
-let b:comments = 0
+setlocal indentexpr=GetSASIndent() indentkeys+==data,=proc,=run;,=quit;,=end;,=endsas,=enddata,=select,=%macro,=%mend
 
-"flag indicating if it is in a data or proc step. If at the end of the
-"step, there is not a "run;" statement, manually adjust the indent
-let b:step = 0
-"flag indicating if it is in a macro
-let b:macro = 0
-
-setlocal indentexpr=SASGetIndent(v:lnum)
-setlocal indentkeys+==~DO,=~END,=~IF,=~THEN,=~ELSE
-setlocal indentkeys+==~PROC,=~RUN,=~DATA
-setlocal indentkeys+==~%DO,=~%END,=~%IF,=~%THEN,=~%ELSE
-setlocal indentkeys+==~%MACRO,=~%MEND
-
-" Only define the function once.
-if exists("*SASGetIndent")
-  finish
+if exists("*GetSASIndent")
+	finish
 endif
 
-" Similar to java.vim indent file
-function! SkipSASBlanksAndComments(startline)
-  let lnum = a:startline
-  while lnum > 1
-    let lnum = prevnonblank(lnum)
-    if getline(lnum) =~ '\*/\s*$'
-      while getline(lnum) !~ '/\*' && lnum > 1
-        let lnum = lnum - 1
-      endwhile
-      if getline(lnum) =~ '^\s*/\*'
-        let lnum = lnum - 1
-      else
-        break
-      endif
-    elseif getline(lnum) =~ '^\s*\*'
-      let lnum = lnum - 1
-    else
-      break
-    endif
-  endwhile
-  return lnum
+let s:cpo_save = &cpo
+set cpo&vim
+
+" Regex that defines the start of a section
+let s:section_begin_regex = '^\s*\<\(data\|proc\)\>'
+
+" Regex that defines the start of a block
+let s:block_begin_regex = '\(\<do\>.*\<to\>\|\<do;\|\<select (\|\<select;\)'
+
+" Regex that defines the start of a macro
+let s:macro_begin_regex = '^\s*%macro\>'
+
+" Regex that defines the end of a section
+let s:section_end_regex = '^\s*\(run\|quit\|enddata\);'
+
+" Regex that defines the end of a block
+let s:block_end_regex = '^\s*end;'
+
+" Regex that defines the end of a macro
+let s:macro_end_regex = '^\s*%mend\>'
+
+" Regex that defines the end of the program
+let s:prog_end_regex = '^\s*\<endsas\>'
+
+" Find the line number of previous keyword defined by the regex
+function s:PrevRegex(lnum, regex)
+	let lnum = prevnonblank(a:lnum - 1)
+	while lnum > 0
+		let line = getline(lnum)
+		if line =~ a:regex
+			break
+		else
+			let lnum = prevnonblank(lnum - 1)
+		endif
+	endwhile
+	return lnum
 endfunction
 
-function SASGetIndent(lnum)
-  let currstat = getline(v:lnum)
+" Main function
+function GetSASIndent()
+	let lnum = prevnonblank(v:lnum - 1)
+	let ind = indent(lnum)
+	let pline = getline(lnum)
+	let cline = getline(v:lnum)
 
-  "Skip comments line
-  if b:comments == 1 || currstat =~ '^\s*\*' || currstat =~ '^\s*/\*'
-    if currstat =~ '^\s*/\*'
-      let b:comments = 1
-    endif 
-    if currstat =~ '\*/\s*$'
-      let b:comments = 0
-    endif
-    return -1
-  endif
+	" First non-blank line of the program
+	if lnum == 0
+		return 0
+	endif
 
-  "there is a run; statement missing in the last step, manually adjust the indent
-  if currstat =~? '^\s*\(data\|proc\)\>' && b:macro == 0
-    let b:step = 1
-    return 0
-  endif
-  if currstat =~? '^\s*%macro\>'
-    let b:macro = 1
-    if b:step == 1
-      let b:step = 0
-    endif
-    return 0
-  endif
-  
-  "Find the previous non-blank and non comments line
-  let plnum = SkipSASBlanksAndComments(v:lnum-1)
+	" Previous non-blank line is the start of a section/macro/block
+	if pline =~ s:section_begin_regex
+	\ || pline =~ s:macro_begin_regex
+	\ || pline =~ s:block_begin_regex
+		let ind = ind + &sts
+	endif
 
-  "Use zero indent at the top of the file
-  if plnum == 0
-    return 0
-  endif
+	" Current line is the start/end of a section
+	if cline =~ s:section_begin_regex
+	\ || cline =~ s:section_end_regex
+		let prev_start_lnum = s:PrevRegex(v:lnum, s:section_begin_regex)
+		let prev_end_lnum = max([s:PrevRegex(v:lnum, s:section_end_regex), s:PrevRegex(v:lnum, s:macro_end_regex), s:PrevRegex(v:lnum, s:prog_end_regex), s:PrevRegex(v:lnum, s:macro_begin_regex)])
+		if prev_end_lnum < prev_start_lnum
+			return ind - &sts
+		endif
+	endif
 
-  let ind = indent(plnum)
-  let prevstat = getline(plnum)
+	" Current line is the end of a block
+	if cline =~ s:block_end_regex
+		return ind - &sts
+	endif
 
-  "Add a shiftwidth to statements following if, else, %if, %else
-  "do, %do, data, proc and %macro
-  if prevstat =~? '^\s*\(do\|%do\|data\|proc\|%macro\|if\|%if\|else\|%else\)\>'
-    let ind = ind + &sw
+	" Current line is the end of a macro
+	if cline =~ s:macro_end_regex
+		let prev_macro_lnum = s:PrevRegex(v:lnum, s:macro_begin_regex)
+		let ind = indent(prev_macro_lnum)
+		return ind
+	endif
 
-    " Remove unwanted indent after logical and arithmetic ifs
-    if (prevstat =~? '^\s*\(if\|else\)\>' 
-          \ && prevstat =~? ';' && prevstat !~? '\<do\>'
-          \ && currstat !~? '^\s*else\>')
-      let ind = ind - &sw
-    endif
-    if (prevstat =~? '^\s*\(%if\|%else\)\>' 
-          \ && prevstat =~? ';' && prevstat !~? '%do\>'
-          \ && currstat !~? '^\s*%else\>')
-      let ind = ind - &sw
-    endif
+	" Current line is the end of the program
+	if cline =~ s:prog_end_regex
+		return 0
+	endif
 
-    " If it's a do; statement, remove the unwanted indent
-    if ((currstat =~? '^\s*\(do\|%do\)\>') && (prevstat !~? '^\s*\(do\|%do\)\>')
-          \ && (currstat !~? '\<\(to\|%to\)\>'))
-      let ind = ind - &sw
-    endif
-
-    " If previous statement is like proc ... run; or data ... run;
-    " remove the indent
-    if prevstat =~? '^\s*\(data\|proc\)\>' && prevstat =~? '\<run\>'
-      let ind = ind - &sw
-    endif
-  endif
-
-  "Subtract a shiftwidth from else, %else, end, %end, run and %mend
-  if (currstat =~? '^\s*\(else\|%else\|end\|%end\)\>')
-    let ind = ind - &sw
-  endif
-  
-  "If it is a %mend statement, indent is 0
-  if currstat =~? '^\s*%mend\>'
-    let b:step = 0
-    let b:macro = 0
-    return 0
-  endif
-
-  "If it is run statement, align to the corresponding data or proc statement
-  if currstat =~? '\<run\>'
-    let b:step = 0
-    if b:macro == 0
-      return 0
-    else
-      let ind = ind - &sw
-      let alignline = v:lnum-1
-      while alignline > 1
-        if getline(alignline) =~? '^\s*\(data\|proc\)\>'
-          let ind = indent(alignline)
-          return ind
-        else
-          let alignline = alignline-1
-        endif
-      endwhile
-    endif
-  endif
-
-  "If previous is a if...; or end; statement and current is a else statment,
-  "add an additional indent
-  if ((prevstat =~? '\<end\>' && currstat =~? '\<else\>')
-        \ || (prevstat =~? '\<%end\>' && currstat =~? '\<%else\>'))
-    let ind = ind + &sw
-  endif
-
-  return ind
+	return ind
 endfunction
 
-" vim:sw=2 ts=8
+let &cpo = s:cpo_save
+unlet s:cpo_save
