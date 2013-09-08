@@ -59,11 +59,13 @@ function! LoadSASLogLst()
 
     " Run SAS on path/file name (modify to your location of sas)
     :echo "*** Running SAS..."
-    let returntxt = system("/usr/local/bin/sas -nodms " . shellescape(expand("%:p")))
+    "let returntxt = system("/usr/local/bin/sas -nodms " . shellescape(expand("%:p")))
     " The following may work for your Windows system. Comment the line above and uncomment 
     " the two lines below and make them one long line.
     "let returntxt = system("\"" . shellescape("C:\\Program\ Files\\SAS\\SAS\ 9.1\\sas.exe") 
     ".  "\ -nosplash" . "\ -sysin" . "\ " . shellescape(expand("%:p")) .  "\"") 
+	
+	let returntxt = system("\"" . "C:\Program Files\SAS\SASFoundation\9.2\sas.exe" .  "\ -nosplash" . "\ -sysin" . "\ " . shellescape(expand("%:p")) .  "\"") 
 
     " Shows the return messages from the SAS commandline (may be useful
     " if no log produced)
