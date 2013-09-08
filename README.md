@@ -8,7 +8,7 @@ This package is many things.
 SAS syntax  by  Zhenhuan Hu
 ---------------------------
 
-SAS indent  by  Jianzhong Liu
+SAS indent  by  Zhenhuan Hu
 ------------------------------
 
 Run, cklog functions by Kent Nassen
