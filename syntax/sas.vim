@@ -46,7 +46,7 @@
 "    Added keywords for use in SAS SQL procedure and highlighting for
 "    SAS base procedures, added logic to distinqush between versions
 "    for SAS macro variable highlighting (Thanks to user Ronald
-"    Höllwarth for pointing out bug)
+"    Hï¿½llwarth for pointing out bug)
 "
 "    For SAS 5: Clear all syntax items
 "    For SAS 6: Quit when a syntax file was already loaded
@@ -151,7 +151,7 @@ syn match sasProcName "\<PROC\( \w\+\>\|\>\)" contained
 syn region sasProc start="^\s*PROC" end=";"me=e-1 contains=sasProcName, sasStep, sasString, sasNumber, sasComment, sasMacro, sasMacroFunction, sasMacroVar
 syn region sasProcSQL start="^\s*PROC SQL\>" end="\(^\|;\)\s*quit\s*;"me=e-1 contains=sasProcName, sasStep, sasString, sasNumber, sasComment, sasMacro, sasMacroFunction, sasMacroVar, sasProcSQLKwd keepend
 
-" Thanks to Ronald Höllwarth for this fix to an intra-versioning
+" Thanks to Ronald Hï¿½llwarth for this fix to an intra-versioning
 " problem with this little feature
 " Used a more efficient way to match macro vars (Zhenhuan Hu)
 if version < 600
